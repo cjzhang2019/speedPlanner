@@ -10,12 +10,12 @@ import collision_check
 import rs_path
 import grid_a_star
 import math
-import queue
 import scipy.spatial
 import matplotlib.pyplot as plt
 import time
 import copy
 import CubicSpline
+import qp_solver
 
 font1 = {'family' : 'Times New Roman', 'weight' : 'normal', 'size'   : 20}
 predictTime = 30
@@ -152,8 +152,6 @@ def calc_motion_inputs():
     u = [0.0] + [i for i in up] + [-i for i in up]
     d = [1.0 for i in range(len(u))]
     #d = 1 move forward d = -1 move backward
-    print(u)
-    print(d)
     return u, d
 
 def calc_rs_path_cost(rspath):
@@ -503,7 +501,6 @@ def calc_hybrid_astar_path(sx , sy , syaw , gx , gy , gyaw ,  ox , oy , xyreso ,
         plt.plot(current.x[::-1],current.y[::-1],"rx")
         
         if ((current.x[-1] - gx) ** 2 + (current.y[-1] - gy) ** 2  < 2 or current.x[-1] > 20):
-            print("currentx:", current.x[-1])
             last_A_star_node_ind = c_id
             break
 
@@ -541,7 +538,7 @@ def calc_hybrid_astar_path(sx , sy , syaw , gx , gy , gyaw ,  ox , oy , xyreso ,
         
 def generate_target_course(x, y):
     csp = CubicSpline.Spline2D(x, y)
-    s = np.arange(0, csp.s[-1], 0.1)
+    s = np.arange(0, csp.s[-1], 1)
     rx, ry, ryaw, rk = [], [], [], []
     for i_s in s:
         ix, iy = csp.calc_position(i_s)
@@ -734,7 +731,7 @@ def main():
     wx = [0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0, 28.0, 32.0, 36.0, 40.0]
     wy = [0.0, 0.0, 0.0, -1, -2, -3, -4, -4, -4, -4, -4]
     ob1 = {'id':1,'x':6,'y':-4,'speed':15,'heading':0, 'sDecision':0}
-    ob2 = {'id':2,'x':3,'y':3,'speed':8,'heading':-30, 'sDecision':1}
+    ob2 = {'id':2,'x':5,'y':5,'speed':6,'heading':-90, 'sDecision':1}
 #    ob3 = {'id':3,'x':50,'y':12,'speed':1,'heading':-30, 'sDecision':0}
 #here is the output of decision module, 0 means following, 1 means overtaking
     obList.append(ob1)
@@ -762,9 +759,18 @@ def main():
         velocityPointX = PATH.x
         velocityPointY = PATH.y
         for i in range(len(velocityPointX)-1):
-            velocityV.append(10*(velocityPointY[i+1] - velocityPointY[i])/(velocityPointX[i+1] - velocityPointX[i]))
+            velocityV.append((velocityPointY[i+1] - velocityPointY[i])/(velocityPointX[i+1] - velocityPointX[i]))
+        velocityV.append(velocityV[-1])
     drawVelocityPlanningResult(velocityPointX, velocityPointY, obstaclePredictionResultList)
-    print(velocityV)
+    rx = []
+    ry = []
+    ryaw = []
+    for i_s in velocityPointY:
+        ix, iy = csp.calc_position(i_s)
+        rx.append(ix)
+        ry.append(iy)
+        ryaw.append(csp.calc_yaw(i_s))
+    qp_solver.qpSolver(rx, ry, ryaw, velocityV)
     
     
     
